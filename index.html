@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>배터리 양극 역설계 시각화</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{color-scheme:dark;--bg:#080c14;--card:#0f172a;--fg:#e2e8f0;--mut:#94a3b8;--line:#1e293b;--acc:#38bdf8;--ni:#ef4444;--co:#22c55e;--mn:#3b82f6;--al:#f59e0b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root[data-theme="light"]{color-scheme:light;--bg:#f8fafc;--card:#fff;--fg:#0f172a;--mut:#64748b;--line:#e2e8f0;--acc:#0284c7}
+
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif}
+.w{max-width:1000px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:6px 0 10px}h2{font-size:15px;margin:0 0 8px}
+.tabs{display:flex;gap:6px;margin:8px 0}.tabs button,.seg button{border:1px solid var(--line);background:var(--card);color:var(--fg);padding:8px 14px;border-radius:999px;font:inherit;font-size:14px;cursor:pointer}
+.tabs button.on,.seg button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+label{font-size:13px;color:var(--mut);display:block;margin-bottom:4px}select,input[type=range]{width:100%}select{padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit}
+.seg{display:flex;gap:6px}.v{font-size:22px;font-weight:700}.row{display:flex;justify-content:space-between;align-items:baseline}
+canvas{width:100%;display:block}
+.leg{display:flex;flex-wrap:wrap;gap:10px;font-size:13px;margin-bottom:8px}.leg i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px}
+.ratio{display:flex;height:22px;border-radius:6px;overflow:hidden;margin-bottom:6px}.ratio div{font-size:11px;color:#fff;text-align:center;line-height:22px;transition:flex .4s}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.st{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}.st b{display:block;font-size:20px}.st span{font-size:12px;color:var(--mut)}
+.bars div.b{display:grid;grid-template-columns:130px 1fr 70px;gap:8px;align-items:center;font-size:12px;margin:4px 0}.bars .t{background:var(--line);border-radius:4px;height:12px}.bars .t i{display:block;height:100%;border-radius:4px;background:var(--acc);transition:width .4s}
+.sub{font-size:12px;color:var(--mut)}.pg{display:none}.pg.on{display:block}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}.hd{display:flex;align-items:center;gap:12px;padding:6px 0 12px;border-bottom:1px solid var(--line);margin-bottom:10px}.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#10b981,#06b6d4,#2563eb);display:grid;place-items:center;font-size:20px;box-shadow:0 4px 14px rgba(6,182,212,.25)}.hd h1{margin:0;font-size:17px;background:linear-gradient(90deg,#34d399,#22d3ee,#60a5fa);-webkit-background-clip:text;background-clip:text;color:transparent}.hd p{margin:2px 0 0;font-size:11px;color:var(--mut)}.v,.st b{font-family:"JetBrains Mono",ui-monospace,monospace}.card h2{letter-spacing:.2px}
+</style></head><body><div class="w">
+<div class="hd"><div class="logo">🔋</div><div><h1>18650 Cathode Reverse Engineering System</h1><p>양극 길이 · 원소 조성 · 최적 입도 역설계 시각화 플랫폼</p></div></div>
+<div class="tabs"><button class="on" data-p="0">① 설계 시각화</button><button data-p="1">② 상세 계산값</button></div>
+<div class="card"><div class="ctl">
+<div><label>조성</label><select id="mat"></select></div>
+<div><label>결정구조</label><div class="seg"><button data-c="단결정">단결정</button><button data-c="다결정" class="on">다결정</button></div></div>
+<div><div class="row"><label>목표 용량</label><span class="v"><span id="cv">3400</span> mAh</span></div><input id="cap" type="range" min="500" max="6000" step="50" value="3400"></div>
+<div><div class="row"><label>목표 전압</label><span class="v"><span id="vv">4.2</span> V</span></div><input id="vol" type="range" min="2" max="5" step="0.1" value="4.2"></div>
+</div></div>
+
+<div class="pg on" id="p0">
+<div class="card"><h2>① 범례 · 원소 조성</h2>
+<div class="leg"><span><i style="background:var(--ni)"></i>Ni</span><span><i style="background:var(--co)"></i>Co</span><span><i style="background:var(--mn)"></i>Mn</span><span><i style="background:var(--al)"></i>Al</span></div>
+<div id="ratio" hidden></div><div class="sub" id="note"></div></div>
+<div class="card"><div class="row"><h2>② 양극 극판 (길이는 용량·전압에 따라 변화, 구체 = 원소 조성)</h2><span class="v" id="lenv"></span></div>
+<canvas id="cl" height="230"></canvas><div class="sub">구체 한 개 = 금속 원소 하나(Ni·Co·Mn·Al 비율대로 채움). 가로 = 양극 길이, 세로 = 극판 폭 58.6 mm</div></div>
+<div class="card"><div class="row"><h2>③ 최적 입도 (계산에 따라 변화)</h2><span class="v" id="dv"></span></div>
+<div class="two"><canvas id="cp" height="250"></canvas></div>
+<div class="sub" id="dnote"></div></div>
+</div>
+
+<div class="pg" id="p1">
+<div class="card"><h2>핵심 계산값</h2><div class="grid" id="stats"></div></div>
+<div class="two"><div class="card"><h2>전극 단면 (편면 코팅두께 비례)</h2><svg id="sec" viewBox="0 0 300 150" width="100%"></svg><div class="sub">Al박 41.4 μm 양면에 합제 코팅</div></div>
+<div class="card"><h2>원소 비율</h2><div style="display:flex;gap:14px;align-items:center"><div id="donut" style="width:120px;height:120px;border-radius:50%;position:relative"><div style="position:absolute;inset:26px;background:var(--card);border-radius:50%"></div></div><div class="sub" id="dleg" style="line-height:1.8"></div></div></div></div>
+<div class="card bars"><h2>10개 조합 비교: 같은 용량·전압에서 필요한 양극 길이 (mm)</h2><div id="sweep"></div></div>
+<div id="val" hidden></div>
+</div>
+</div>
+<script>
+const $=id=>document.getElementById(id),cl=(x,a,b)=>Math.min(Math.max(x,a),b);
+const SP={NCA:[190,202,210,216],NCM811:[195,205,213,220],NCM622:[158,165,176,187],NCM523:[155,170,180,190],NCM111:[148,155,162,170]};
+const K=['d','l','ni','co','mn','al','d50','sd','dmin','dmax'];
+const PCr={NCA:[2.10,31.75,85.40,7.76,0,6.84,12.64,2.76,6.20,20.66],NCM811:[1.95,28.28,88.24,6.27,4.12,1.38,13.14,1.36,9.60,16.13],NCM622:[2.00,24,60,20,20,0,11.5,2.5,5,18],NCM523:[1.95,22,50,20,30,0,11,2.5,5,17],NCM111:[1.90,20,33.3,33.3,33.3,0,10.5,2.5,5,16]};
+const SCr={NCA:[2.42,35,3.5,1,2,5.5],NCM811:[2.24,31,3.5,1,2,5.5],NCM622:[2.30,26.5,4.5,1.2,2.5,6.5],NCM523:[2.24,24,4.8,1.2,2.5,7],NCM111:[2.19,22,5,1.2,3,7]};
+const LAB={NCA:'NCA (실측 평균)',NCM811:'NCM811 (실측: NCMA형, Al 1.4%)',NCM622:'NCM622',NCM523:'NCM523',NCM111:'NCM111'};
+const MATS=Object.keys(SP);
+function props(m,c){const a=PCr[m],o={};K.forEach((k,i)=>o[k]=a[i]);if(c==='단결정'){const s=SCr[m];o.d=s[0];o.l=s[1];o.d50=s[2];o.sd=s[3];o.dmin=s[4];o.dmax=s[5]}return o}
+function spec(m,v){v=cl(v,4,4.6);const a=SP[m],i=cl(Math.floor((v-4.2)/0.1+1e-9),0,2);return a[i]+(a[i+1]-a[i])*(v-(4.2+i*0.1))/0.1}
+function design(m,c,C,V){const p=props(m,c),q=spec(m,V),act=C/q,comp=act/0.96,t=p.l/p.d*10,A=comp*1000/(2*p.l),len=A/5.86*10,foil=41.4/1e4*A*2.7;
+const r=(p.ni/85.4)*((cl(V,3.5,4.6)-3)/1.2)/Math.sqrt(C/3400),dopt=cl(p.d50*Math.sqrt(r),p.dmin,p.dmax);
+return{p,q,act,comp,t,A,len,foil,tot:comp+foil,r,dopt}}
+let S={m:'NCM811',c:'다결정',C:3400,V:4.2},disp={len:0,d:12},tgt=null;
+MATS.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=LAB[m];$('mat').appendChild(o)});$('mat').value=S.m;
+const mulb=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const R=mulb(7),U=Array.from({length:400},()=>[R(),R(),R()]);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function cv(id){const c=$(id),r=devicePixelRatio||1,w=c.clientWidth,h=+c.getAttribute('height');if(c.width!==w*r){c.width=w*r;c.height=h*r}const x=c.getContext('2d');x.setTransform(r,0,0,r,0,0);x.clearRect(0,0,w,h);return[x,w,h]}
+function pick(p,u){const s=p.ni+p.co+p.mn+p.al;let a=u*s;return a<p.ni?'--ni':a<p.ni+p.co?'--co':a<p.ni+p.co+p.mn?'--mn':'--al'}
+function drawLen(){const[x,w,h]=cv('cl'),p=tgt.p,x0=20,W=w-40,bt=h-70,bh=34,Lw=disp.len/2000*W;x.font='12px sans-serif';x.fillStyle=css('--mut');
+for(let t=0;t<=2000;t+=500){const px=x0+t/2000*W;x.fillRect(px,bt+bh+4,1,6);x.textAlign='center';x.fillText(t+' mm',px,bt+bh+24)}
+x.strokeStyle=css('--acc');x.fillStyle=css('--acc');x.globalAlpha=.18;x.fillRect(x0,bt,Lw,bh);x.globalAlpha=1;x.lineWidth=2;x.strokeRect(x0,bt,Lw,bh);x.textAlign='left';x.fillStyle=css('--fg');x.fillText('양극 길이 '+Math.round(disp.len)+' mm',x0+8,bt+bh/2+4);
+const n=Math.round(disp.len/6),pile=p.l*2.2;for(let i=0;i<n&&i<400;i++){const[u,v,k]=U[i];x.fillStyle=css(pick(p,k));x.beginPath();x.arc(x0+4+u*(Lw-8),bt-6-v*pile,4.5,0,7);x.fill()}
+const rx=x0+795/2000*W;x.setLineDash([4,4]);x.strokeStyle=css('--mut');x.beginPath();x.moveTo(rx,10);x.lineTo(rx,bt+bh);x.stroke();x.setLineDash([]);x.fillStyle=css('--mut');x.textAlign='center';x.fillText('실측 최대 795',rx,10)}
+const SPR={};function sph(c,r,dp){const k=c+r+dp;if(SPR[k])return SPR[k];const z=Math.ceil(2*r*dp),s=document.createElement('canvas');s.width=s.height=z;const g=s.getContext('2d'),R=z/2;g.beginPath();g.arc(R,R,R-.5,0,7);g.clip();g.fillStyle=c;g.fillRect(0,0,z,z);let a=g.createRadialGradient(R*.65,R*.6,0,R*.65,R*.6,R*1.1);a.addColorStop(0,'rgba(255,255,255,.85)');a.addColorStop(.45,'rgba(255,255,255,0)');g.fillStyle=a;g.fillRect(0,0,z,z);a=g.createRadialGradient(R*.7,R*.65,R*.5,R,R,R);a.addColorStop(0,'rgba(0,0,0,0)');a.addColorStop(1,'rgba(0,0,0,.5)');g.fillStyle=a;g.fillRect(0,0,z,z);return SPR[k]=s}
+function drawRect(){const[x,w,h]=cv('cl'),p=tgt.p,x0=24,W=w-48,top=36,H=112,Lw=disp.len/2000*W,dp=devicePixelRatio||1,r=6,dx=2*r+1.5,dy=dx*.866,s=p.ni+p.co+p.mn+p.al,cl4=['#ef4444','#22c55e','#3b82f6','#f59e0b'],th=[];let a=0;[p.ni,p.co,p.mn,p.al].forEach(v=>{a+=v/s;th.push(a)});
+x.font='11px "JetBrains Mono",monospace';x.textAlign='center';x.fillStyle=css('--mut');for(let t=0;t<=2000;t+=500){const px=x0+t/2000*W;x.fillRect(px,top+H+24,1,5);x.fillText(t,px,top+H+42)}
+x.strokeStyle=css('--mut');x.lineWidth=1;x.beginPath();x.moveTo(x0,24);x.lineTo(x0+Lw,24);x.moveTo(x0,18);x.lineTo(x0,30);x.moveTo(x0+Lw,18);x.lineTo(x0+Lw,30);x.stroke();x.fillStyle=css('--fg');x.font='600 12px "JetBrains Mono",monospace';x.fillText('양극 길이 '+Math.round(disp.len)+' mm',x0+Lw/2,15);
+x.fillStyle='rgba(56,189,248,.07)';x.fillRect(x0,top,Lw,H);x.save();x.beginPath();x.rect(x0,top,Lw,H);x.clip();const rows=Math.floor((H-6-2*r)/dy)+1,cols=Math.ceil(Lw/dx);let n=0;
+for(let c=0;c<cols;c++)for(let q=0;q<rows;q++){const u=(((c*rows+q)*.6180339887)%1);let i=th.findIndex(t=>u<=t+1e-9);if(i<0)i=0;x.drawImage(sph(cl4[i],r,dp),x0+3+c*dx+(q%2?dx/2:0),top+3+q*dy,2*r,2*r);n++}x.restore();
+x.strokeStyle=css('--acc');x.lineWidth=1.5;x.strokeRect(x0,top,Lw,H);x.save();x.translate(11,top+H/2);x.rotate(-Math.PI/2);x.fillStyle=css('--mut');x.font='11px sans-serif';x.fillText('극판 폭 58.6 mm',0,0);x.restore();
+x.fillStyle=css('--mut');x.font='11px sans-serif';x.textAlign='right';x.fillText(n+' 구체',x0+W,top+H+18)}
+function drawPart(){const[x,w,h]=cv('cp'),S5=5,sq=Math.min(w-10,220),p=tgt.p;x.strokeStyle=css('--fg');x.lineWidth=1.5;x.strokeRect(5,22,sq,sq);x.fillStyle=css('--mut');x.font='12px sans-serif';x.textAlign='center';x.fillText('1 cm × 1 cm (개념도)',5+sq/2,15);
+const d=disp.d*S5,r=d/2,rr=mulb(11);let pts=[];for(let k=0;k<4000&&pts.length<260;k++){const px=5+r+rr()*(sq-d),py=22+r+rr()*(sq-d);if(pts.every(q=>(q[0]-px)**2+(q[1]-py)**2>(d*.92)**2))pts.push([px,py])}
+pts.forEach((q,i)=>{x.fillStyle=css(pick(p,U[i][2]));x.globalAlpha=.55;x.beginPath();x.arc(q[0],q[1],r,0,7);x.fill();x.globalAlpha=1;x.strokeStyle=css('--fg');x.lineWidth=.8;x.stroke()});
+if(pts.length){x.setLineDash([3,3]);x.strokeStyle=css('--mut');x.beginPath();x.moveTo(pts[0][0]+r,pts[0][1]);x.lineTo(5+sq+10,22+sq/2);x.stroke();x.setLineDash([])}}
+function drawCurve(){const[x,w,h]=cv('cc'),T=tgt,d0=T.p.d50,r=T.r,m=22,L=36,B=h-34,Wd=w-L-14,Hh=B-24,J=d=>d/d0+r*d0/d,Jm=2*Math.sqrt(r),X=d=>L+(d-1)/21*Wd,Y=j=>B-Math.min(j/Jm,4)/4*Hh;
+x.font='11px sans-serif';x.fillStyle=css('--mut');x.textAlign='center';[1,5,10,15,20].forEach(d=>x.fillText(d,X(d),B+14));x.fillText('입도 (μm)',L+Wd/2,B+28);x.save();x.translate(10,B-Hh/2);x.rotate(-Math.PI/2);x.fillText('상대 손실(작을수록 효율↑)',0,0);x.restore();
+x.setLineDash([2,3]);x.strokeStyle=css('--mut');[12.5,13.78,11.63,13.62,12.65].forEach(d=>{x.beginPath();x.moveTo(X(d),B);x.lineTo(X(d),B-12);x.stroke()});x.setLineDash([]);
+x.strokeStyle=css('--acc');x.lineWidth=2.5;x.beginPath();for(let d=1;d<=22;d+=.25){const px=X(d),py=Y(J(d));d===1?x.moveTo(px,py):x.lineTo(px,py)}x.stroke();
+x.fillStyle=css('--ni');x.beginPath();x.arc(X(T.dopt),Y(J(T.dopt)),6,0,7);x.fill();x.fillStyle=css('--fg');x.fillText('최적 '+T.dopt.toFixed(1)+' μm',cl(X(T.dopt),50,w-50),Y(J(T.dopt))-12);
+x.fillStyle=css('--mut');x.textAlign='left';x.fillText('손실 = 밀도손실(∝입도) + 표면적손실(∝1/입도)',L+4,12)}
+function render(){const m=S.m,T=design(m,S.c,S.C,S.V);tgt=T;const p=T.p,s=p.ni+p.co+p.mn+p.al;
+$('cv').textContent=S.C;$('vv').textContent=S.V.toFixed(1);
+$('ratio').innerHTML=[['ni','--ni','Ni'],['co','--co','Co'],['mn','--mn','Mn'],['al','--al','Al']].filter(e=>p[e[0]]>0).map(e=>`<div style="flex:${p[e[0]]};background:var(${e[1]})">${e[2]} ${p[e[0]].toFixed(1)}%</div>`).join('');
+$('note').textContent=(p.al>0&&p.mn>0?'NCMA형(Ni-Co-Mn-Al)':p.al>0?'NCA형(Ni-Co-Al)':'NCM형(Ni-Co-Mn)')+' · Ni '+p.ni.toFixed(1)+' / Co '+p.co.toFixed(1)+' / Mn '+p.mn.toFixed(1)+' / Al '+p.al.toFixed(1)+' (%)';
+$('lenv').textContent=Math.round(T.len)+' mm';$('dv').textContent=T.dopt.toFixed(1)+' μm';
+const N=0.6e8/(Math.PI*T.dopt**2/4);$('dnote').textContent=`기준 D50 ${p.d50} μm(${S.c==='다결정'&&(m==='NCA'||m==='NCM811')?'실측':'문헌'}) → 최적 ${T.dopt.toFixed(1)} μm. 1 cm² 당 입자 약 ${Math.round(N/1000)*1000>=1e6?(N/1e6).toFixed(1)+'백만':Math.round(N/1000)+'천'} 개. 최적 입도는 용량↑(밀도 필요)이면 작게, Ni·전압↑(표면 반응성)이면 크게 이동하는 가정 기반 모델입니다.`;
+const st=[['활물질량',T.act.toFixed(2),'g'],['합제 질량',T.comp.toFixed(2),'g'],['추정 비용량',T.q.toFixed(0),'mAh/g'],['로딩(편면)',p.l.toFixed(1),'mg/cm²'],['합제밀도',p.d.toFixed(2),'g/cm³'],['코팅두께(편면)',T.t.toFixed(0),'μm'],['전극 면적',T.A.toFixed(0),'cm²'],['집전체 중량',T.foil.toFixed(2),'g'],['극판 총중량',T.tot.toFixed(2),'g']];
+$('stats').innerHTML=st.map(e=>`<div class="st"><span>${e[0]}</span><b>${e[1]}</b><span>${e[2]}</span></div>`).join('');
+const sc=1.3,tc=T.t*sc/2,al=41.4*sc/2*.6,cx=150,cy=75,H=100;
+$('sec').innerHTML=`<rect x="${cx-70}" y="${cy-tc-al/2}" width="140" height="${tc}" fill="var(--acc)" opacity=".8"/><rect x="${cx-70}" y="${cy-al/2}" width="140" height="${al}" fill="var(--mut)"/><rect x="${cx-70}" y="${cy+al/2}" width="140" height="${tc}" fill="var(--acc)" opacity=".8"/><text x="${cx+76}" y="${cy-al/2-tc/2+4}" font-size="11" fill="var(--fg)">${T.t.toFixed(0)} μm</text><text x="${cx+76}" y="${cy+4}" font-size="11" fill="var(--fg)">Al 41.4 μm</text><text x="${cx+76}" y="${cy+al/2+tc/2+4}" font-size="11" fill="var(--fg)">${T.t.toFixed(0)} μm</text>`;
+let a=0,g=[];[['ni','--ni','Ni'],['co','--co','Co'],['mn','--mn','Mn'],['al','--al','Al']].forEach(e=>{const f=p[e[0]]/s*100;g.push(`var(${e[1]}) ${a}% ${a+f}%`);a+=f});$('donut').style.background=`conic-gradient(${g.join(',')})`;
+$('dleg').innerHTML=['ni','co','mn','al'].map((k,i)=>`<span style="color:var(${['--ni','--co','--mn','--al'][i]})">●</span> ${k.toUpperCase()} ${p[k].toFixed(1)}%`).join('<br>');
+const rows=[];MATS.forEach(mm=>['단결정','다결정'].forEach(cc=>rows.push([mm+' '+cc,design(mm,cc,S.C,S.V).len,mm===m&&cc===S.c])));const mx=Math.max(...rows.map(r=>r[1]));
+$('sweep').innerHTML=rows.map(r=>`<div class="b"><span>${r[0]}${r[2]?' ◀':''}</span><div class="t"><i style="width:${r[1]/mx*100}%;${r[2]?'background:var(--ni)':''}"></i></div><span>${Math.round(r[1])}</span></div>`).join('');
+const cells=[['파나소닉 3100','NCA',3100,795],['파나소닉 3400','NCA',3400,790],['파나소닉 3600','NCA',3600,790],['라이칸 3400','NCM811',3400,680],['소샤인 3400','NCM811',3400,670]];
+$('val').innerHTML=cells.map(c=>{const pr=design(c[1],'다결정',c[2],4.2).len,e=(pr-c[3])/c[3]*100;return`<div class="b"><span>${c[0]}</span><div class="t" style="position:relative"><i style="width:${pr/900*100}%"></i><i style="position:absolute;top:0;left:0;width:${c[3]/900*100}%;background:none;border-right:3px solid var(--ni)"></i></div><span>${Math.round(pr)}/${c[3]} (${e.toFixed(0)}%)</span></div>`}).join('')+'<div class="sub">막대 = 예측, 빨간 선 = 실측</div>'}
+function loop(){const T=tgt;if(T){disp.len+=(T.len-disp.len)*.12;disp.d+=(T.dopt-disp.d)*.12;if($('p0').classList.contains('on')){drawRect();drawPart()}}requestAnimationFrame(loop)}
+$('mat').onchange=e=>{S.m=e.target.value;render()};$('cap').oninput=e=>{S.C=+e.target.value;render()};$('vol').oninput=e=>{S.V=+(+e.target.value).toFixed(1);render()};
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.seg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');S.c=b.dataset.c;render()});
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');document.querySelectorAll('.pg').forEach(x=>x.classList.remove('on'));$('p'+b.dataset.p).classList.add('on')});
+render();disp.len=tgt.len*.3;disp.d=tgt.dopt;loop();
+</script></body></html>
